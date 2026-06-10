@@ -46,10 +46,16 @@ agent.command("pay", async (ctx) => {
   });
 });
 
-// ── @mention handler ──────────────────────────────────────────────────────────
+// ── @mention handler (group) ──────────────────────────────────────────────────
 
 agent.onMessage(async (ctx) => {
   await ctx.reply(`Hi! You said: "${ctx.payload.content}"`);
+});
+
+// ── DM handler ────────────────────────────────────────────────────────────────
+
+agent.onDm((ctx) => {
+  ctx.reply(`You DMed me: "${ctx.payload.content}"`);
 });
 
 // ── Register commands on startup ──────────────────────────────────────────────
@@ -148,14 +154,24 @@ Register a slash command. `name` is the command without the leading `/`.
 
 ### `agent.onMessage(handler)`
 
-Handle @mentions. **MessageContext**:
+Handle @mentions in group channels. **MessageContext**:
 
 | Property / Method | Description |
 |-------------------|-------------|
-| `ctx.payload` | `MessagePayload` |
+| `ctx.payload` | `MessagePayload` (`groupId`, `channelId`, `content`, …) |
 | `ctx.client` | `BevoAgentClient` instance |
 | `ctx.reply(text)` | Post a text reply to the same channel |
 | `ctx.replyWith(payload)` | Post a rich reply |
+
+### `agent.onDm(handler)`
+
+Handle direct messages. The reply is **synchronous** — call `ctx.reply()` inside the handler and the content is returned in the webhook response body so Bevo displays it immediately. **DmContext**:
+
+| Property / Method | Description |
+|-------------------|-------------|
+| `ctx.payload` | `DmMessagePayload` (`conversationId`, `senderPrincipalId`, `content`, …) |
+| `ctx.client` | `BevoAgentClient` instance |
+| `ctx.reply(text)` | Reply to this DM (synchronous — call before handler returns) |
 
 ### `agent.client` — `BevoAgentClient`
 

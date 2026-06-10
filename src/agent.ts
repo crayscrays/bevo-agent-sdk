@@ -3,6 +3,7 @@ import type {
   BotCommand,
   CommandPayload,
   MessagePayload,
+  DmMessagePayload,
   WebhookEvent,
   WebhookResponse,
   SendMessagePayload,
@@ -56,10 +57,25 @@ export interface MessageContext {
   replyWith(payload: Omit<SendMessagePayload, "groupId" | "channelId">): Promise<void>;
 }
 
+export interface DmContext {
+  /** The incoming DM payload. */
+  readonly payload: DmMessagePayload;
+  /** Pre-authenticated agent client. */
+  readonly client: BevoAgentClient;
+
+  /** Reply with plain text (synchronous — returned in webhook response body). */
+  reply(content: string): void;
+  /** Reply with a rich card (synchronous). */
+  replyCard(card: AppCard): void;
+  /** Reply with a full payload — card, embed, or text (synchronous). */
+  replyWith(payload: Pick<UpdateMessagePayload, "content" | "contentType" | "card" | "embed">): void;
+}
+
 // ── Handler types ─────────────────────────────────────────────────────────────
 
 export type CommandHandler = (ctx: CommandContext) => void | Promise<void>;
 export type MessageHandler = (ctx: MessageContext) => void | Promise<void>;
+export type DmHandler = (ctx: DmContext) => void | Promise<void>;
 
 // ── Agent options ─────────────────────────────────────────────────────────────
 
@@ -103,6 +119,7 @@ export class BevoAgent {
 
   private readonly commandHandlers = new Map<string, CommandHandler>();
   private messageHandler: MessageHandler | null = null;
+  private dmHandler: DmHandler | null = null;
   private registeredCommands: BotCommand[] = [];
 
   constructor(options: BevoAgentOptions) {
@@ -132,6 +149,16 @@ export class BevoAgent {
   }
 
   /**
+   * Register a handler for direct messages.
+   * Reply synchronously with `ctx.reply()` — the content is returned in the
+   * webhook response body so Bevo can display it immediately in the DM thread.
+   */
+  onDm(handler: DmHandler): this {
+    this.dmHandler = handler;
+    return this;
+  }
+
+  /**
    * Push the registered commands to Bevo. Call this once on startup after
    * all `agent.command()` calls.
    */
@@ -152,6 +179,9 @@ export class BevoAgent {
     if (event.event === "message") {
       await this._handleMessage(event.payload);
       return null;
+    }
+    if (event.event === "dm_message") {
+      return this._handleDm(event.payload);
     }
     return null;
   }
@@ -235,22 +265,16 @@ export class BevoAgent {
       defer: async (): Promise<DeferredContext> => {
         syncResponse = { type: 5 };
         const placeholderMessageId = payload.placeholderMessageId;
+        const isDm = Boolean(payload.conversationId && !payload.groupId);
+        const doUpdate = (p: UpdateMessagePayload) =>
+          isDm
+            ? this.client.updateDmMessage(String(placeholderMessageId), p).then(() => undefined)
+            : this.client.updateMessage(placeholderMessageId as number, p).then(() => undefined);
         return {
-          update: (content: string) =>
-            this.client
-              .updateMessage(placeholderMessageId, { content, contentType: "text" })
-              .then(() => undefined),
+          update: (content: string) => doUpdate({ content, contentType: "text" }),
           updateCard: (card: AppCard) =>
-            this.client
-              .updateMessage(placeholderMessageId, {
-                card,
-                contentType: card.type === "payment_request" ? "payment_request" : "app_card",
-              })
-              .then(() => undefined),
-          updateWith: (p: UpdateMessagePayload) =>
-            this.client
-              .updateMessage(placeholderMessageId, p)
-              .then(() => undefined),
+            doUpdate({ card, contentType: card.type === "payment_request" ? "payment_request" : "app_card" }),
+          updateWith: (p: UpdateMessagePayload) => doUpdate(p),
         };
       },
     };
@@ -281,5 +305,35 @@ export class BevoAgent {
     };
 
     await this.messageHandler(ctx);
+  }
+
+  // ── Private: DM handling ──────────────────────────────────────────────────
+
+  private async _handleDm(payload: DmMessagePayload): Promise<WebhookResponse | null> {
+    if (!this.dmHandler) return null;
+
+    let syncResponse: WebhookResponse | null = null;
+
+    const ctx: DmContext = {
+      payload,
+      client: this.client,
+      reply: (content: string) => {
+        syncResponse = { content };
+      },
+      replyCard: (card: AppCard) => {
+        syncResponse = { card };
+      },
+      replyWith: (p) => {
+        if (p.card) {
+          syncResponse = { card: p.card };
+        } else {
+          syncResponse = { content: p.content ?? "" };
+        }
+      },
+    };
+
+    await this.dmHandler(ctx);
+
+    return syncResponse;
   }
 }

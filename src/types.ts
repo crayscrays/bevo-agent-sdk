@@ -127,11 +127,15 @@ export interface CommandPayload {
   options: Record<string, unknown>;
   resolved: { users: Record<string, ResolvedUser> };
   rawArgs: string;
-  groupId: number;
-  channelId: number;
+  /** Present for group slash commands. */
+  groupId?: number;
+  /** Present for group slash commands. */
+  channelId?: number;
+  /** Present for DM slash commands. */
+  conversationId?: string;
   senderId: string;
-  messageId: number;
-  placeholderMessageId: number;
+  messageId: string | number;
+  placeholderMessageId: string | number;
   createdAt: string;
 }
 
@@ -146,6 +150,14 @@ export interface MessagePayload {
   createdAt: string;
 }
 
+export interface DmMessagePayload {
+  conversationId: string;
+  messageId: string;
+  senderPrincipalId: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface SlashCommandEvent {
   event: "slash_command";
   payload: CommandPayload;
@@ -156,7 +168,12 @@ export interface MessageEvent {
   payload: MessagePayload;
 }
 
-export type WebhookEvent = SlashCommandEvent | MessageEvent;
+export interface DmMessageEvent {
+  event: "dm_message";
+  payload: DmMessagePayload;
+}
+
+export type WebhookEvent = SlashCommandEvent | MessageEvent | DmMessageEvent;
 
 // ── Agent API I/O ─────────────────────────────────────────────────────────────
 

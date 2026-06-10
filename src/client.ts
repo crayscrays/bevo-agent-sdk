@@ -54,7 +54,7 @@ export class BevoAgentClient {
   }
 
   /**
-   * Update a placeholder message (deferred response pattern).
+   * Update a group message placeholder (deferred response pattern).
    * Pass the `placeholderMessageId` from the command payload.
    */
   updateMessage(
@@ -62,6 +62,17 @@ export class BevoAgentClient {
     payload: UpdateMessagePayload
   ): Promise<{ message: GroupMessage }> {
     return this.request("PATCH", `/messages/${messageId}`, payload);
+  }
+
+  /**
+   * Update a DM message placeholder (deferred response pattern for DM slash commands).
+   * Pass the `placeholderMessageId` from the command payload when `conversationId` is set.
+   */
+  updateDmMessage(
+    messageId: string,
+    payload: UpdateMessagePayload
+  ): Promise<{ message: DmMessage }> {
+    return this.request("PATCH", `/dm-messages/${encodeURIComponent(messageId)}`, payload);
   }
 
   /** Send a direct message to a conversation. */

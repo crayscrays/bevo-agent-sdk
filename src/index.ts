@@ -3,9 +3,11 @@ export type {
   BevoAgentOptions,
   CommandContext,
   MessageContext,
+  DmContext,
   DeferredContext,
   CommandHandler,
   MessageHandler,
+  DmHandler,
 } from "./agent.js";
 
 export { BevoAgentClient } from "./client.js";
@@ -34,8 +36,10 @@ export type {
   // Webhook events
   CommandPayload,
   MessagePayload,
+  DmMessagePayload,
   SlashCommandEvent,
   MessageEvent,
+  DmMessageEvent,
   WebhookEvent,
   ResolvedUser,
 
