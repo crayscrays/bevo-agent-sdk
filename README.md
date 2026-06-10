@@ -16,7 +16,7 @@ import express from "express";
 
 const agent = new BevoAgent({
   apiKey: process.env.BEVO_API_KEY!,
-  apiBase: process.env.BEVO_API_BASE!, // e.g. https://api.bevo.app
+  apiBase: process.env.BEVO_API_BASE!, // e.g. https://bevo-server-staging.up.railway.app
 });
 
 // ── Slash commands ────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ await agent.client.sendMessage({
 | Option | Type | Description |
 |--------|------|-------------|
 | `apiKey` | `string` | Agent API key from the developer portal |
-| `apiBase` | `string` | Bevo backend URL (e.g. `https://api.bevo.app`) |
+| `apiBase` | `string` | Bevo backend URL (e.g. `https://bevo-server-staging.up.railway.app`) |
 
 ### `agent.command(name, handler, meta?)`
 

@@ -67,7 +67,7 @@ export interface BevoAgentOptions {
   /** Agent API key obtained from the Bevo developer portal. */
   apiKey: string;
   /**
-   * Base URL of the Bevo backend (e.g. `https://api.bevo.app`).
+   * Base URL of the Bevo backend (e.g. `https://bevo-server-staging.up.railway.app`).
    * Override for local development.
    */
   apiBase: string;
@@ -83,7 +83,7 @@ export interface BevoAgentOptions {
  * ```ts
  * import { BevoAgent } from "@bevo/agent-sdk";
  *
- * const agent = new BevoAgent({ apiKey: process.env.BEVO_API_KEY!, apiBase: "https://api.bevo.app" });
+ * const agent = new BevoAgent({ apiKey: process.env.BEVO_API_KEY!, apiBase: "https://bevo-server-staging.up.railway.app" });
  *
  * agent.command("ping", (ctx) => ctx.reply("pong!"));
  *
