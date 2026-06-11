@@ -1,4 +1,5 @@
 import type {
+  AgentUser,
   BotCommand,
   SendMessagePayload,
   UpdateMessagePayload,
@@ -89,6 +90,11 @@ export class BevoAgentClient {
    */
   registerCommands(commands: BotCommand[]): Promise<{ ok: true; registered: number }> {
     return this.request("PUT", "/commands", { commands });
+  }
+
+  /** Look up a user's profile and wallet address by principalId. */
+  async getUser(principalId: string): Promise<AgentUser> {
+    return this.request("GET", `/users/${encodeURIComponent(principalId)}`);
   }
 
   /** List members of a group. */

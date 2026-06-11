@@ -254,6 +254,15 @@ export interface DeferredAck {
 
 export type WebhookResponse = SyncTextResponse | SyncCardResponse | DeferredAck;
 
+// ── Agent user lookup ─────────────────────────────────────────────────────────
+
+export interface AgentUser {
+  principalId: string;
+  username: string | null;
+  displayName: string | null;
+  walletAddress: string | null;
+}
+
 // ── Permission scopes ─────────────────────────────────────────────────────────
 
 export type BevoPermission =
