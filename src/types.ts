@@ -1,6 +1,6 @@
 // ── Command & capability schema ──────────────────────────────────────────────
 
-export type CommandOptionType = "user" | "string" | "integer" | "boolean";
+export type CommandOptionType = "user" | "string" | "integer" | "boolean" | "token";
 
 export interface CommandOption {
   name: string;
@@ -11,6 +11,7 @@ export interface CommandOption {
    * Static list of selectable values for this parameter. When provided, the
    * Bevo app renders a tap-to-select list instead of a free-text field.
    * Can be any strings — not limited to tokens or any particular domain.
+   * Takes priority over `type: "token"` if both are set.
    *
    * @example ["sword", "shield", "potion"]
    * @example ["USDC", "ETH", "BTC"]
@@ -133,10 +134,23 @@ export interface ResolvedUser {
   displayName: string | null;
 }
 
+/** Full details for a token the user selected via a type:"token" parameter. */
+export interface ResolvedToken {
+  symbol: string;
+  /** EVM contract address, or "native" for the chain's native gas token. */
+  address: string;
+  chain: string;
+}
+
 export interface CommandPayload {
   commandName: string;
   options: Record<string, unknown>;
-  resolved: { users: Record<string, ResolvedUser> };
+  resolved: {
+    /** Keyed by "@handle". Present for options with type:"user". */
+    users: Record<string, ResolvedUser>;
+    /** Keyed by token symbol. Present for options with type:"token". */
+    tokens: Record<string, ResolvedToken>;
+  };
   rawArgs: string;
   /** Present for group slash commands. */
   groupId?: number;

@@ -21,21 +21,31 @@ const agent = new BevoAgent({
 
 // ── Slash commands ────────────────────────────────────────────────────────────
 
+// Simple command — no parameters
 agent.command("ping", (ctx) => {
   ctx.reply("pong!");
 });
 
+// type:"token" — shows the user's wallet with CAs and balances
 agent.command("price", async (ctx) => {
-  // Defer when the work takes more than a second
   const deferred = await ctx.defer();
-  const price = await fetchTokenPrice(ctx.payload.options.token as string);
+  const symbol = ctx.payload.options.token as string;        // e.g. "USDC"
+  const token  = ctx.payload.resolved.tokens[symbol];        // { symbol, address, chain }
+  const price  = await fetchTokenPrice(token.address, token.chain);
   await deferred.update(`Current price: **$${price}**`);
+}, {
+  description: "Get the price of a token you hold",
+  options: [
+    { name: "token", type: "token", description: "Token to check", required: true },
+  ],
 });
 
+// type:"user" — shows an @mention picker
 agent.command("pay", async (ctx) => {
-  const recipient = ctx.payload.resolved.users[ctx.payload.options.to as string];
+  const key       = ctx.payload.options.to as string;        // e.g. "@alice"
+  const recipient = ctx.payload.resolved.users[key];          // { principalId, username, displayName }
   await ctx.defer();
-  // ... perform transaction ...
+  // ... perform transaction using recipient.principalId ...
   await ctx.client.updateMessage(ctx.payload.placeholderMessageId, {
     contentType: "payment_request",
     card: {
@@ -44,6 +54,24 @@ agent.command("pay", async (ctx) => {
       description: `Sent to ${recipient?.displayName ?? "user"}`,
     },
   });
+}, {
+  description: "Pay a user",
+  options: [
+    { name: "to",     type: "user",   description: "Recipient", required: true  },
+    { name: "amount", type: "string", description: "Amount",    required: true  },
+  ],
+});
+
+// choices — static tap-to-select list (any strings, not limited to tokens)
+agent.command("equip", (ctx) => {
+  const item = ctx.payload.options.item as string;           // e.g. "sword"
+  ctx.reply(`You equipped the ${item}!`);
+}, {
+  description: "Equip an item",
+  options: [
+    { name: "item", type: "string", description: "Item to equip", required: true,
+      choices: ["sword", "shield", "potion"] },
+  ],
 });
 
 // ── @mention handler (group) ──────────────────────────────────────────────────
@@ -134,9 +162,46 @@ await agent.client.sendMessage({
 
 Register a slash command. `name` is the command without the leading `/`.
 
-**Command options and `choices`**
+**Command option types and selectable lists**
 
-Each option in the `options` array can include a `choices` field — a static list of strings the user can tap to select in the Bevo app instead of typing freely. Use this for any enumerable parameter: item names, categories, chains, modes, etc.
+The `type` field controls how the Bevo app renders the input for that parameter:
+
+| type | App behaviour | What the agent receives |
+|------|---------------|------------------------|
+| `"string"` | Free-text input (default) | Plain string in `options` |
+| `"integer"` | Free-text input, numeric keyboard | Number in `options` |
+| `"boolean"` | Free-text input | Boolean in `options` |
+| `"user"` | @mention picker | `options.name = "@handle"` + full user object in `resolved.users["@handle"]` |
+| `"token"` | Wallet token picker with live balances | `options.name = "SYMBOL"` + `{ symbol, address, chain }` in `resolved.tokens["SYMBOL"]` |
+
+**`type: "user"` — mention picker**
+
+The user sees a searchable list of people in the conversation. The selected user's `@handle` is stored in `options`, and the full identity (principalId, username, displayName) is in `resolved.users`:
+
+```ts
+agent.command("pay", async (ctx) => {
+  const key = ctx.payload.options.to as string;         // e.g. "@alice"
+  const user = ctx.payload.resolved.users[key];          // { principalId, username, displayName }
+  // use user.principalId for on-chain or API operations
+});
+```
+
+**`type: "token"` — wallet token picker**
+
+The user sees all tokens they hold, with their contract address (CA) and balance. The selected token's symbol is in `options`; the full details — symbol, CA, and chain — are in `resolved.tokens`:
+
+```ts
+agent.command("swap", async (ctx) => {
+  const symbol = ctx.payload.options.token as string;         // e.g. "USDC"
+  const token = ctx.payload.resolved.tokens[symbol];          // { symbol, address, chain }
+  // token.address is the EVM contract address (or "native" for gas tokens)
+  // token.chain is the chain identifier, e.g. "base", "eth"
+});
+```
+
+**`choices` — static selectable list**
+
+Any option can also include a `choices` array — a static list of strings the user can tap to select instead of typing freely. Works with any `type` and takes priority over `type: "token"` if both are set.
 
 ```ts
 await agent.syncCommands([
@@ -149,29 +214,25 @@ await agent.syncCommands([
         type: "string",
         description: "Item to equip",
         required: true,
-        choices: ["sword", "shield", "potion"],
+        choices: ["sword", "shield", "potion"],  // tap-to-select list
       },
     ],
   },
   {
-    name: "transfer",
-    description: "Transfer a token",
+    name: "swap",
+    description: "Swap a token from your wallet",
     options: [
       {
         name: "token",
-        type: "string",
-        description: "Token to send",
+        type: "token",              // shows the user's full wallet token picker
+        description: "Token to swap",
         required: true,
-        choices: ["USDC", "ETH", "BTC"],
       },
       { name: "amount", type: "string", description: "Amount", required: true },
-      { name: "to", type: "user", description: "Recipient", required: true },
     ],
   },
 ]);
 ```
-
-When a user types `/equip` in Bevo, the app shows a tap-to-select list of `["sword", "shield", "potion"]` for the `item` field. Selecting one fills it in and advances to the next parameter. `choices` can contain any strings — they are not restricted to tokens or any particular domain.
 
 **CommandContext**
 

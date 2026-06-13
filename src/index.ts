@@ -37,6 +37,8 @@ export type {
   ActionRow,
 
   // Webhook events
+  ResolvedUser,
+  ResolvedToken,
   CommandPayload,
   MessagePayload,
   DmMessagePayload,

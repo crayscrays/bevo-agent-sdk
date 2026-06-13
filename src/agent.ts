@@ -131,7 +131,49 @@ export class BevoAgent {
 
   /**
    * Register a slash command handler.
-   * @param name - Command name without the leading `/`.
+   *
+   * @param name    - Command name without the leading `/`.
+   * @param handler - Called when a user invokes this command.
+   * @param meta    - Optional command metadata synced to Bevo via `syncCommands()`.
+   *
+   * **`meta.options`** declares the parameters users fill in before sending the
+   * command. Each option's `type` controls how the Bevo app renders the input:
+   *
+   * - `"string"` (default) — free-text field
+   * - `"integer"` — numeric input
+   * - `"boolean"` — free-text parsed as true/false
+   * - `"user"` — @mention picker; full user details in `ctx.payload.resolved.users`
+   * - `"token"` — wallet token picker (shows the user's holdings with CA and
+   *   balance); symbol in `ctx.payload.options`, full details in
+   *   `ctx.payload.resolved.tokens`
+   *
+   * Any option can also include `choices: string[]` — a static tap-to-select list
+   * shown instead of a free-text field (takes priority over `type: "token"`).
+   *
+   * @example
+   * agent.command("swap", handler, {
+   *   description: "Swap a token from your wallet",
+   *   options: [
+   *     { name: "token",  type: "token",  description: "Token to swap",    required: true },
+   *     { name: "amount", type: "string", description: "Amount",           required: true },
+   *   ],
+   * });
+   *
+   * agent.command("equip", handler, {
+   *   description: "Equip an item",
+   *   options: [
+   *     { name: "item", type: "string", description: "Item", required: true,
+   *       choices: ["sword", "shield", "potion"] },
+   *   ],
+   * });
+   *
+   * agent.command("pay", handler, {
+   *   description: "Pay a user",
+   *   options: [
+   *     { name: "to",     type: "user",   description: "Recipient", required: true },
+   *     { name: "amount", type: "string", description: "Amount",    required: true },
+   *   ],
+   * });
    */
   command(name: string, handler: CommandHandler, meta?: Omit<BotCommand, "name">): this {
     this.commandHandlers.set(name.toLowerCase(), handler);
