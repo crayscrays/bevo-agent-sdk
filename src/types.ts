@@ -98,6 +98,7 @@ export interface SelectOption {
   value: string;
   description?: string;
   emoji?: string;
+  default?: boolean;
 }
 
 export interface SelectMenuComponent {
@@ -107,6 +108,7 @@ export interface SelectMenuComponent {
   options: SelectOption[];
   minValues?: number;
   maxValues?: number;
+  disabled?: boolean;
 }
 
 export interface ActionRow {
@@ -177,6 +179,51 @@ export type WebhookEvent = SlashCommandEvent | MessageEvent | DmMessageEvent;
 
 // ── Agent API I/O ─────────────────────────────────────────────────────────────
 
+// ── Execution wrapper types (EXECUTION message metadata.execution) ────────────
+
+export type ExecutionType =
+  | "payment_request"
+  | "contract_call"
+  | "butler_action"
+  | "approval_request"
+  | "trade";
+
+/** Controls who signs an EXECUTION wrapper message. */
+export type ExecutionSigningMode = "butler_auto" | "user_sign" | "butler_or_user";
+
+/**
+ * Structured transaction data stored in metadata.execution for EXECUTION messages
+ * (contentType: payment_request | contract_call | butler_action | approval_request).
+ */
+export interface ExecutionPayload {
+  type: ExecutionType;
+  chainId?: number;
+  contractAddress?: string;
+  functionName?: string;
+  args?: unknown[];
+  /** Raw wei amount as hex string. */
+  value?: string;
+  /** Human-readable amount, e.g. "50 USDC". */
+  amount?: string;
+  currency?: string;
+  fromPrincipalId?: string;
+  toPrincipalId?: string;
+  description?: string;
+  /** Originating agent id — stamped by the server for butler policy trust checks. */
+  agentId?: string;
+  /** Full swap intent for type === "trade". */
+  tradeParams?: {
+    tokenIn: string;
+    chainIn: number;
+    amountIn: number;
+    tokenOut: string;
+    chainOut: number;
+    slippageBps?: number;
+    deadlineSecs?: number;
+    recipient?: string;
+  };
+}
+
 export interface SendMessagePayload {
   groupId: number;
   channelId: number;
@@ -186,6 +233,18 @@ export interface SendMessagePayload {
   embed?: EmbedMessage;
   components?: ActionRow[];
   metadata?: Record<string, unknown>;
+  /**
+   * Butler fan-out: "all_butlers" broadcasts to every group member's butler;
+   * an array of principalIds targets specific members only.
+   * Only triggered when contentType is "butler_action" or "payment_request"
+   * and metadata.execution is set.
+   */
+  targets?: "all_butlers" | string[];
+  /**
+   * Controls who signs the execution.
+   * Defaults to "butler_auto" (butler executes if policy passes; silently skips if not).
+   */
+  signingMode?: ExecutionSigningMode;
 }
 
 export interface UpdateMessagePayload {
