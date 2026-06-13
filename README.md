@@ -134,6 +134,45 @@ await agent.client.sendMessage({
 
 Register a slash command. `name` is the command without the leading `/`.
 
+**Command options and `choices`**
+
+Each option in the `options` array can include a `choices` field — a static list of strings the user can tap to select in the Bevo app instead of typing freely. Use this for any enumerable parameter: item names, categories, chains, modes, etc.
+
+```ts
+await agent.syncCommands([
+  {
+    name: "equip",
+    description: "Equip an item",
+    options: [
+      {
+        name: "item",
+        type: "string",
+        description: "Item to equip",
+        required: true,
+        choices: ["sword", "shield", "potion"],
+      },
+    ],
+  },
+  {
+    name: "transfer",
+    description: "Transfer a token",
+    options: [
+      {
+        name: "token",
+        type: "string",
+        description: "Token to send",
+        required: true,
+        choices: ["USDC", "ETH", "BTC"],
+      },
+      { name: "amount", type: "string", description: "Amount", required: true },
+      { name: "to", type: "user", description: "Recipient", required: true },
+    ],
+  },
+]);
+```
+
+When a user types `/equip` in Bevo, the app shows a tap-to-select list of `["sword", "shield", "potion"]` for the `item` field. Selecting one fills it in and advances to the next parameter. `choices` can contain any strings — they are not restricted to tokens or any particular domain.
+
 **CommandContext**
 
 | Property / Method | Description |
@@ -216,6 +255,19 @@ For auto-discovery from the devportal, host a `/.well-known/bevo.json` at your a
         "options": [
           { "name": "to", "type": "user", "description": "Recipient", "required": true },
           { "name": "amount", "type": "string", "description": "Amount to send", "required": true }
+        ]
+      },
+      {
+        "name": "equip",
+        "description": "Equip an item",
+        "options": [
+          {
+            "name": "item",
+            "type": "string",
+            "description": "Item to equip",
+            "required": true,
+            "choices": ["sword", "shield", "potion"]
+          }
         ]
       }
     ]

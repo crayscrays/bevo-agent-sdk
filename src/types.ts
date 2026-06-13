@@ -7,6 +7,15 @@ export interface CommandOption {
   type?: CommandOptionType;
   description?: string;
   required?: boolean;
+  /**
+   * Static list of selectable values for this parameter. When provided, the
+   * Bevo app renders a tap-to-select list instead of a free-text field.
+   * Can be any strings — not limited to tokens or any particular domain.
+   *
+   * @example ["sword", "shield", "potion"]
+   * @example ["USDC", "ETH", "BTC"]
+   */
+  choices?: string[];
 }
 
 export interface BotCommand {
