@@ -44,15 +44,24 @@ agent.command("price", async (ctx) => {
 agent.command("pay", async (ctx) => {
   const key       = ctx.payload.options.to as string;        // e.g. "@alice"
   const recipient = ctx.payload.resolved.users[key];          // { principalId, username, displayName }
+  const amount    = ctx.payload.options.amount as string;     // e.g. "50"
   await ctx.defer();
-  // ... perform transaction using recipient.principalId ...
-  await ctx.client.updateMessage(ctx.payload.placeholderMessageId, {
-    contentType: "payment_request",
-    card: {
-      type: "payment_request",
-      title: "Payment sent",
-      description: `Sent to ${recipient?.displayName ?? "user"}`,
+  await ctx.client.sendMessage({
+    groupId: ctx.payload.groupId!,
+    channelId: ctx.payload.channelId!,
+    contentType: "onchain_tx",
+    card: { type: "app_card", title: `${amount} USDC → ${recipient?.displayName ?? "user"}` },
+    metadata: {
+      execution: {
+        type: "onchain_tx",
+        chainId: 8453,
+        toPrincipalId: recipient?.principalId,
+        amount,
+        currency: "USDC",
+      },
     },
+    targets: [recipient?.principalId],
+    signingMode: "butler_or_user",
   });
 }, {
   description: "Pay a user",
@@ -148,6 +157,157 @@ await agent.client.sendMessage({
   contentType: "agent_tip",
 });
 ```
+
+## Execution wrappers
+
+Any onchain transaction — token transfer, contract call, multi-step swap — is sent as a single `contentType: "onchain_tx"` message. The structured transaction data lives in `metadata.execution`; the optional `card` field provides the human-readable label the client displays.
+
+The server dispatches the execution in this order:
+1. `tradeParams` present → full swap state machine
+2. `to` + `data` present → raw calldata submitted as-is
+3. `toPrincipalId` + `amount` → server resolves recipient wallet and builds calldata
+
+### Token transfer (server-side wallet resolution)
+
+Pass `toPrincipalId` + `amount` and the server looks up the recipient's wallet address and encodes the transfer calldata for you.
+
+```ts
+// Send to one user
+await agent.client.sendMessage({
+  groupId: 42,
+  channelId: 7,
+  content: "50 USDC sent to Alice",
+  contentType: "onchain_tx",
+  card: { type: "app_card", title: "50 USDC → Alice", description: "via TradingBot" },
+  metadata: {
+    execution: {
+      type: "onchain_tx",
+      chainId: 8453,
+      toPrincipalId: "alice-principal-uuid",
+      amount: "50",
+      currency: "USDC",
+    },
+  },
+  targets: ["alice-principal-uuid"],
+  signingMode: "butler_or_user",
+});
+
+// Send to every group member at once
+await agent.client.sendMessage({
+  groupId: 42,
+  channelId: 7,
+  content: "Group dues: 10 USDC each",
+  contentType: "onchain_tx",
+  card: { type: "app_card", title: "10 USDC group fee", description: "Monthly dues" },
+  metadata: {
+    execution: {
+      type: "onchain_tx",
+      chainId: 8453,
+      amount: "10",
+      currency: "USDC",
+    },
+  },
+  targets: "all_butlers",
+  signingMode: "butler_or_user",
+});
+```
+
+### Raw contract call
+
+Pre-encode the calldata in your agent and pass it via `to` + `data`.
+
+```ts
+await agent.client.sendMessage({
+  groupId: 42,
+  channelId: 7,
+  content: "Rewards ready to claim",
+  contentType: "onchain_tx",
+  card: { type: "app_card", title: "Claim rewards", description: "Base" },
+  metadata: {
+    execution: {
+      type: "onchain_tx",
+      chainId: 8453,
+      to: "0xRewardContract",
+      data: encodeFunctionData({ abi, functionName: "claimRewards", args: [] }),
+      value: "0x0",
+      description: "Claim staking rewards",
+    },
+  },
+  targets: "all_butlers",
+  signingMode: "butler_auto",
+});
+```
+
+### ERC-20 approval + swap (two-step)
+
+Send these sequentially; wait for the approval to confirm on-chain before posting the swap.
+
+```ts
+// Step 1 — approve the DEX router to spend tokens
+await agent.client.sendMessage({
+  groupId: 42,
+  channelId: 7,
+  content: "Approving 50 USDC…",
+  contentType: "onchain_tx",
+  card: { type: "app_card", title: "Approve USDC", description: "Required before swap" },
+  metadata: {
+    execution: {
+      type: "onchain_tx",
+      chainId: 8453,
+      to: "0xUsdcContract",
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: ["0xDexRouter", 50_000_000n],
+      }),
+      value: "0x0",
+    },
+  },
+  targets: [userPrincipalId],
+  signingMode: "butler_auto",
+});
+
+// Step 2 — swap 50 USDC → ETH
+await agent.client.sendMessage({
+  groupId: 42,
+  channelId: 7,
+  content: "Swapping 50 USDC → ETH",
+  contentType: "onchain_tx",
+  card: { type: "app_card", title: "Swap 50 USDC → ETH", description: "0.5% slippage" },
+  metadata: {
+    execution: {
+      type: "onchain_tx",
+      chainId: 8453,
+      tradeParams: {
+        tokenIn: "0xUsdcContract",
+        chainIn: 8453,
+        amountIn: 50,
+        tokenOut: "native",
+        chainOut: 8453,
+        slippageBps: 50,
+      },
+    },
+  },
+  targets: [userPrincipalId],
+  signingMode: "butler_auto",
+});
+```
+
+### `targets` and `signingMode`
+
+`targets` controls who receives the execution prompt:
+- `"all_butlers"` — every group member's butler
+- `[principalId, ...]` — specific members only
+
+`signingMode` controls who signs:
+
+| Value | Behaviour |
+|-------|-----------|
+| `"butler_auto"` | Butler executes automatically if policy allows; silently skips if not (default) |
+| `"user_sign"` | Always surface a signing prompt to the user; butler never auto-executes |
+| `"butler_or_user"` | Butler executes if policy passes; falls back to a user-facing prompt if it doesn't |
+
+---
 
 ## API reference
 

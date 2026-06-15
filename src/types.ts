@@ -35,10 +35,7 @@ export type BotContentType =
   | "agent_tip"
   | "agent_info"
   | "ephemeral"
-  | "payment_request"
-  | "contract_call"
-  | "butler_action"
-  | "approval_request"
+  | "onchain_tx"
   | "reply"
   | "attachment"
   | "link_unfurl";
@@ -64,7 +61,7 @@ export interface AppCardAction {
 }
 
 export interface AppCard {
-  type: "app_card" | "payment_request";
+  type: "app_card";
   title: string;
   description?: string;
   imageUrl?: string;
@@ -204,37 +201,30 @@ export type WebhookEvent = SlashCommandEvent | MessageEvent | DmMessageEvent;
 
 // ── Execution wrapper types (EXECUTION message metadata.execution) ────────────
 
-export type ExecutionType =
-  | "payment_request"
-  | "contract_call"
-  | "butler_action"
-  | "approval_request"
-  | "trade";
+export type ExecutionType = "onchain_tx";
 
 /** Controls who signs an EXECUTION wrapper message. */
 export type ExecutionSigningMode = "butler_auto" | "user_sign" | "butler_or_user";
 
 /**
- * Structured transaction data stored in metadata.execution for EXECUTION messages
- * (contentType: payment_request | contract_call | butler_action | approval_request).
+ * Structured transaction data for any onchain action (transfer, contract call, swap).
+ * Stored in metadata.execution on messages with contentType "onchain_tx".
+ *
+ * Dispatch rules (evaluated in order):
+ *  1. tradeParams present → butler runs the full swap state machine
+ *  2. to + data present   → raw calldata is submitted as-is (covers contract calls and native transfers)
+ *  3. toPrincipalId + amount → server resolves the recipient wallet and builds ERC-20 / native calldata
  */
 export interface ExecutionPayload {
-  type: ExecutionType;
+  type: "onchain_tx";
   chainId?: number;
-  contractAddress?: string;
-  functionName?: string;
-  args?: unknown[];
-  /** Raw wei amount as hex string. */
+  /** Recipient address or contract address. */
+  to?: string;
+  /** Pre-encoded ABI calldata (0x-prefixed hex). Use "0x" for plain native-token transfers. */
+  data?: string;
+  /** Native token value as 0x-prefixed wei hex, e.g. "0xde0b6b3a7640000" for 1 ETH. */
   value?: string;
-  /** Human-readable amount, e.g. "50 USDC". */
-  amount?: string;
-  currency?: string;
-  fromPrincipalId?: string;
-  toPrincipalId?: string;
-  description?: string;
-  /** Originating agent id — stamped by the server for butler policy trust checks. */
-  agentId?: string;
-  /** Full swap intent for type === "trade". */
+  /** Swap intent. When present the butler runs the full trading-bot state machine. */
   tradeParams?: {
     tokenIn: string;
     chainIn: number;
@@ -245,6 +235,16 @@ export interface ExecutionPayload {
     deadlineSecs?: number;
     recipient?: string;
   };
+  /** Human-readable amount for display and spend-cap checks, e.g. "50". */
+  amount?: string;
+  /** Token symbol for display and spend-cap checks, e.g. "USDC" or "ETH". */
+  currency?: string;
+  fromPrincipalId?: string;
+  /** Recipient principal ID — server resolves wallet for ERC-20/native transfers. */
+  toPrincipalId?: string;
+  description?: string;
+  /** Stamped by the server for butler policy trust checks. Do not set manually. */
+  agentId?: string;
 }
 
 export interface SendMessagePayload {
@@ -259,8 +259,7 @@ export interface SendMessagePayload {
   /**
    * Butler fan-out: "all_butlers" broadcasts to every group member's butler;
    * an array of principalIds targets specific members only.
-   * Only triggered when contentType is "butler_action" or "payment_request"
-   * and metadata.execution is set.
+   * Only triggered when contentType is "onchain_tx" and metadata.execution is set.
    */
   targets?: "all_butlers" | string[];
   /**

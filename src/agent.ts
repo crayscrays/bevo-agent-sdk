@@ -314,8 +314,7 @@ export class BevoAgent {
             : this.client.updateMessage(placeholderMessageId as number, p).then(() => undefined);
         return {
           update: (content: string) => doUpdate({ content, contentType: "text" }),
-          updateCard: (card: AppCard) =>
-            doUpdate({ card, contentType: card.type === "payment_request" ? "payment_request" : "app_card" }),
+          updateCard: (card: AppCard) => doUpdate({ card, contentType: "app_card" }),
           updateWith: (p: UpdateMessagePayload) => doUpdate(p),
         };
       },
