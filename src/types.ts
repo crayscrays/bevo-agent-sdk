@@ -239,12 +239,28 @@ export interface ExecutionPayload {
   amount?: string;
   /** Token symbol for display and spend-cap checks, e.g. "USDC" or "ETH". */
   currency?: string;
+  /**
+   * Signer wallet address. Stamped by the server with the butler's wallet when the
+   * butler is the signer — do not set manually. The client uses this to know which
+   * wallet to sign from when building a Li.Fi quote or submitting a raw tx.
+   */
+  from?: string;
   fromPrincipalId?: string;
   /** Recipient principal ID — server resolves wallet for ERC-20/native transfers. */
   toPrincipalId?: string;
   description?: string;
   /** Stamped by the server for butler policy trust checks. Do not set manually. */
   agentId?: string;
+}
+
+/**
+ * Typed metadata bag for group and DM messages.
+ * `execution` is the structured onchain transaction payload the butler or user signs.
+ * All other metadata fields remain open (attachments, reply refs, approval steps, etc.).
+ */
+export interface MessageMetadata {
+  execution?: ExecutionPayload;
+  [key: string]: unknown;
 }
 
 export interface SendMessagePayload {
@@ -255,7 +271,7 @@ export interface SendMessagePayload {
   card?: AppCard;
   embed?: EmbedMessage;
   components?: ActionRow[];
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
   /**
    * Butler fan-out: "all_butlers" broadcasts to every group member's butler;
    * an array of principalIds targets specific members only.
@@ -275,7 +291,7 @@ export interface UpdateMessagePayload {
   card?: AppCard;
   embed?: EmbedMessage;
   components?: ActionRow[];
-  metadata?: Record<string, unknown>;
+  metadata?: MessageMetadata;
 }
 
 export interface SendDmPayload {
@@ -287,7 +303,7 @@ export interface GroupMember {
   id: number;
   groupId: number;
   principalId: string;
-  walletAddress?: string;
+  agentWalletAddress?: string | null;
   roleIds: string[];
   joinedAt: string;
   displayName?: string;
@@ -341,7 +357,7 @@ export interface AgentUser {
   principalId: string;
   username: string | null;
   displayName: string | null;
-  walletAddress: string | null;
+  agentWalletAddress: string | null;
 }
 
 // ── Permission scopes ─────────────────────────────────────────────────────────

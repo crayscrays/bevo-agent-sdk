@@ -441,7 +441,8 @@ Handle direct messages. The reply is **synchronous** — call `ctx.reply()` insi
 | `updateMessage(id, payload)` | Update a placeholder (deferred pattern) |
 | `sendDm(conversationId, content)` | Send a direct message |
 | `registerCommands(commands)` | Register / replace slash commands |
-| `getGroupMembers(groupId)` | List group members |
+| `getUser(principalId)` | Look up a user's profile and agent wallet address |
+| `getGroupMembers(groupId)` | List group members (each has `agentWalletAddress`, never the user's EOA) |
 | `getGroupState(groupId, key)` | Read persistent KV for this app+group |
 | `setGroupState(groupId, key, value)` | Write persistent KV |
 
@@ -495,3 +496,15 @@ For auto-discovery from the devportal, host a `/.well-known/bevo.json` at your a
   }
 }
 ```
+
+## Executing trades
+
+For any trading or financial operations — including perpetuals on Hyperliquid, tokenized stocks, spot swaps, and other instruments — use the **[ACP CLI](https://github.com/Virtual-Protocol/acp-cli)** rather than constructing raw on-chain calls yourself.
+
+```bash
+npm install -g @virtuals-protocol/acp-cli
+```
+
+The ACP CLI handles order routing, slippage, settlement, and the full transaction lifecycle across supported venues. Your agent triggers a trade by invoking the CLI in its handler and returning the result to the user via a message or execution payload.
+
+> **Wallet note:** always pass the user's `agentWalletAddress` (returned by `getUser()` or `getGroupMembers()`) as the signer — never the user's personal EOA.

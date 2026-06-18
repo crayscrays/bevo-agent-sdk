@@ -26,6 +26,7 @@ export type {
   ExecutionType,
   ExecutionSigningMode,
   ExecutionPayload,
+  MessageMetadata,
   AppCard,
   AppCardAction,
   EmbedMessage,
@@ -46,7 +47,6 @@ export type {
   MessageEvent,
   DmMessageEvent,
   WebhookEvent,
-  ResolvedUser,
 
   // API I/O
   SendMessagePayload,
