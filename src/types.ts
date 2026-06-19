@@ -211,7 +211,10 @@ export type ExecutionSigningMode = "butler_auto" | "user_sign" | "butler_or_user
  * Stored in metadata.execution on messages with contentType "onchain_tx".
  *
  * Dispatch rules (evaluated in order):
- *  1. tradeParams present → butler runs the full swap state machine
+ *  1. tradeParams present → butler runs the full swap state machine; amount is
+ *     NEVER set by the agent — resolved at execution time from the user's butler
+ *     policy (auto path) or typed by the user (manual sign path).
+ *     Always pair with `targets` + `signingMode` on the message.
  *  2. to + data present   → raw calldata is submitted as-is (covers contract calls and native transfers)
  *  3. toPrincipalId + amount → server resolves the recipient wallet and builds ERC-20 / native calldata
  */
@@ -224,11 +227,15 @@ export interface ExecutionPayload {
   data?: string;
   /** Native token value as 0x-prefixed wei hex, e.g. "0xde0b6b3a7640000" for 1 ETH. */
   value?: string;
-  /** Swap intent. When present the butler runs the full trading-bot state machine. */
+  /**
+   * Swap intent. When present the butler runs the full trading-bot state machine.
+   * `amountIn` is intentionally absent — resolved at execution time:
+   *   - Auto path (butler_auto): from the user's policy (per_buy_percent / per_buy_usdc)
+   *   - Manual path (user_sign / butler_or_user): typed by the user in the card UI
+   */
   tradeParams?: {
     tokenIn: string;
     chainIn: number;
-    amountIn: number;
     tokenOut: string;
     chainOut: number;
     slippageBps?: number;
