@@ -36,6 +36,8 @@ export type {
   SelectMenuComponent,
   SelectOption,
   ActionRow,
+  AttachmentMessage,
+  LinkUnfurlMessage,
 
   // Webhook events
   ResolvedUser,
