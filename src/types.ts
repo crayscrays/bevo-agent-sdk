@@ -123,6 +123,32 @@ export interface ActionRow {
   components: Array<ButtonComponent | SelectMenuComponent>;
 }
 
+// ── Attachment & link unfurl ──────────────────────────────────────────────────
+
+/** Structured data for contentType "attachment" (file or image upload). */
+export interface AttachmentMessage {
+  url: string;
+  filename: string;
+  /** MIME type, e.g. "image/png" or "application/pdf". */
+  contentType?: string;
+  /** File size in bytes. */
+  size?: number;
+  /** Image/video width in pixels. */
+  width?: number;
+  /** Image/video height in pixels. */
+  height?: number;
+}
+
+/** Structured data for contentType "link_unfurl" (OG-tag preview). */
+export interface LinkUnfurlMessage {
+  url: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  siteName?: string;
+  favicon?: string;
+}
+
 // ── Webhook event payloads ────────────────────────────────────────────────────
 
 export interface ResolvedUser {
@@ -232,6 +258,7 @@ export interface ExecutionPayload {
    * `amountIn` is intentionally absent — resolved at execution time:
    *   - Auto path (butler_auto): from the user's policy (per_buy_percent / per_buy_usdc)
    *   - Manual path (user_sign / butler_or_user): typed by the user in the card UI
+   * Always pair with `targets` + `signingMode` on the message.
    */
   tradeParams?: {
     tokenIn: string;
@@ -262,11 +289,20 @@ export interface ExecutionPayload {
 
 /**
  * Typed metadata bag for group and DM messages.
- * `execution` is the structured onchain transaction payload the butler or user signs.
- * All other metadata fields remain open (attachments, reply refs, approval steps, etc.).
  */
 export interface MessageMetadata {
+  /** Structured onchain transaction payload the butler or user signs. */
   execution?: ExecutionPayload;
+  /** For contentType "attachment" — file or image data. */
+  attachment?: AttachmentMessage;
+  /** Optional caption on attachment messages. */
+  caption?: string;
+  /** For contentType "embed" — rich embed. */
+  embed?: EmbedMessage;
+  /** For contentType "app_card" — card payload. */
+  card?: AppCard;
+  /** For contentType "components" — interactive action rows. */
+  components?: ActionRow[];
   [key: string]: unknown;
 }
 
